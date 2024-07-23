@@ -1,3 +1,5 @@
+// https://www.makerguides.com/wp-content/uploads/2019/10/TB6600-Manual.pdf
+
 #define dirPinL 2
 #define stepPinL 3
 #define dirPinR 4
