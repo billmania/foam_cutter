@@ -26,16 +26,16 @@ for a machine with identity kinematics for an xyz machine employing 3 joints (mo
   4) Build and install the component using halcompile:
      $ cd \\fBmydir\\fR
      $ [sudo] halcompile --install cablekins.comp
-     # Note:
-     #      sudo is required when using a deb install
-     #      sudo is \\fBnot\\fR required for run-in-place builds
-     # $ man halcompile for more info
+#Note:
+#sudo is required when using a deb install
+#sudo is \\fBnot\\fR required for run - in - place builds
+#$ man halcompile for more info
   5) Specify cablekins in an ini file as:
      \\fB[KINS]\\fR
      \\fBKINEMATICS=cablekins\\fR
      \\fBJOINTS=2\\fR
-     # the number of JOINTS must agree with the
-     # number of joints used in your modified cablekins.comp
+#the number of JOINTS must agree with the
+#number of joints used in your modified cablekins.comp
   6) Note: the manpage for cablekins is not updated by halcompile --install
   7) To use a different component name, rename the file (example mykins.comp)
      and change all instances of 'userkins' to 'mykins'.
@@ -58,8 +58,8 @@ license "GPL";
 author "Dave Franchino";
 ;;
 
-#include "rtapi_math.h"
 #include "kinematics.h"
+#include "rtapi_math.h"
 
 #define HAL_PREFIX "cablekins"
 
@@ -72,7 +72,7 @@ author "Dave Franchino";
 #define LEFT_DRUM_Y 0.0
 #define RIGHT_DRUM_X 500.0
 #define RIGHT_DRUM_Y 0.0
-#define DRUM_DIAMETER (360/M_PI)
+#define DRUM_DIAMETER (360 / M_PI)
 #define DRUM_CIRCUMFERENCE 350.0
 
 #define HOME_X 100.0
@@ -82,111 +82,115 @@ author "Dave Franchino";
 #define RIGHT_CABLE_HOME_LENGTH 531.375
 
 double calcF1(double thetaL, double thetaR) {
-  double XL = LEFT_DRUM_X -cos(thetaL) * DRUM_DIAMETER/2 + (LEFT_CABLE_HOME_LENGTH- thetaL * DRUM_DIAMETER/2) * sin(thetaL);
-  double XR = RIGHT_DRUM_X + cos(thetaR) * DRUM_DIAMETER/2 - (RIGHT_CABLE_HOME_LENGTH - thetaR * DRUM_DIAMETER/2) * sin(thetaR);
+  double XL =
+      LEFT_DRUM_X - cos(thetaL) * DRUM_DIAMETER / 2 +
+      (LEFT_CABLE_HOME_LENGTH - thetaL * DRUM_DIAMETER / 2) * sin(thetaL);
+  double XR =
+      RIGHT_DRUM_X + cos(thetaR) * DRUM_DIAMETER / 2 -
+      (RIGHT_CABLE_HOME_LENGTH - thetaR * DRUM_DIAMETER / 2) * sin(thetaR);
   return XL - XR;
 }
 
 double calcF2(float thetaL, float thetaR) {
-  double YL = LEFT_DRUM_Y-sin(thetaL) * DRUM_DIAMETER/2 - (LEFT_CABLE_HOME_LENGTH - thetaL * DRUM_DIAMETER/2) * cos(thetaL);
-  double YR = RIGHT_DRUM_Y-sin(thetaR) * DRUM_DIAMETER/2 - (RIGHT_CABLE_HOME_LENGTH - thetaR * DRUM_DIAMETER/2) * cos(thetaR);
+  double YL =
+      LEFT_DRUM_Y - sin(thetaL) * DRUM_DIAMETER / 2 -
+      (LEFT_CABLE_HOME_LENGTH - thetaL * DRUM_DIAMETER / 2) * cos(thetaL);
+  double YR =
+      RIGHT_DRUM_Y - sin(thetaR) * DRUM_DIAMETER / 2 -
+      (RIGHT_CABLE_HOME_LENGTH - thetaR * DRUM_DIAMETER / 2) * cos(thetaR);
   return YL - YR;
 }
 
-double** calcJacobian(double thetaL, double thetaR) {
-    double** jacobian = hal_malloc(2 * sizeof(double*));
-    jacobian[0] = hal_malloc(2 * sizeof(double));
-    jacobian[1] = hal_malloc(2 * sizeof(double));
+double **calcJacobian(double thetaL, double thetaR) {
+  double **jacobian = hal_malloc(2 * sizeof(double *));
+  jacobian[0] = hal_malloc(2 * sizeof(double));
+  jacobian[1] = hal_malloc(2 * sizeof(double));
 
-    double dF1dThetaL = (calcF1(thetaL + 0.0001, thetaR) - calcF1(thetaL, thetaR)) / 0.0001;
-    double dF1dThetaR = (calcF1(thetaL, thetaR + 0.0001) - calcF1(thetaL, thetaR)) / 0.0001;
-    double dF2dThetaL = (calcF2(thetaL + 0.0001, thetaR) - calcF2(thetaL, thetaR)) / 0.0001;
-    double dF2dThetaR = (calcF2(thetaL, thetaR + 0.0001) - calcF2(thetaL, thetaR)) / 0.0001;
+  double dF1dThetaL =
+      (calcF1(thetaL + 0.0001, thetaR) - calcF1(thetaL, thetaR)) / 0.0001;
+  double dF1dThetaR =
+      (calcF1(thetaL, thetaR + 0.0001) - calcF1(thetaL, thetaR)) / 0.0001;
+  double dF2dThetaL =
+      (calcF2(thetaL + 0.0001, thetaR) - calcF2(thetaL, thetaR)) / 0.0001;
+  double dF2dThetaR =
+      (calcF2(thetaL, thetaR + 0.0001) - calcF2(thetaL, thetaR)) / 0.0001;
 
-    jacobian[0][0] = dF1dThetaL;
-    jacobian[0][1] = dF1dThetaR;
-    jacobian[1][0] = dF2dThetaL;
-    jacobian[1][1] = dF2dThetaR;
+  jacobian[0][0] = dF1dThetaL;
+  jacobian[0][1] = dF1dThetaR;
+  jacobian[1][0] = dF2dThetaL;
+  jacobian[1][1] = dF2dThetaR;
 
-    return jacobian;
+  return jacobian;
 }
 
-double** invertMatrix(double** m) {
-    double** invertedMatrix = hal_malloc(2 * sizeof(double*));
-    invertedMatrix[0] = hal_malloc(2 * sizeof(double));
-    invertedMatrix[1] = hal_malloc(2 * sizeof(double));
+double **invertMatrix(double **m) {
+  double **invertedMatrix = hal_malloc(2 * sizeof(double *));
+  invertedMatrix[0] = hal_malloc(2 * sizeof(double));
+  invertedMatrix[1] = hal_malloc(2 * sizeof(double));
 
-    double det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
+  double det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
 
-    if (det == 0.0) {
-        return NULL;
-    }
+  if (det == 0.0) {
+    return NULL;
+  }
 
-    invertedMatrix[0][0] = m[1][1] / det;
-    invertedMatrix[0][1] = -m[0][1] / det;
-    invertedMatrix[1][0] = -m[1][0] / det;
-    invertedMatrix[1][1] = m[0][0] / det;
+  invertedMatrix[0][0] = m[1][1] / det;
+  invertedMatrix[0][1] = -m[0][1] / det;
+  invertedMatrix[1][0] = -m[1][0] / det;
+  invertedMatrix[1][1] = m[0][0] / det;
 
-    return invertedMatrix;
+  return invertedMatrix;
 }
-
 
 static struct haldata {
   hal_u32_t *in;
   hal_u32_t *out;
   hal_float_t param_rw;
   hal_float_t param_ro;
-} *haldata;
+} * haldata;
 
 FUNCTION(fdemo) {
-   if (fpin == 0) {
-       rtapi_print("fdemo function added to thread\n");
-   }
-   fpin++;
+  if (fpin == 0) {
+    rtapi_print("fdemo function added to thread\n");
+  }
+  fpin++;
 }
 
 static int cablekins_setup(void) {
-    int res=0;
+  int res = 0;
 
-    if (comp_id < 0) {
-        rtapi_print("\n!!! %s setup failed res=%d\n\n",__FILE__,res);
-        return -1;
-    }
-    if (hal_set_unready(comp_id)) {
-        rtapi_print("\n!!! hal_set_unready failed\n");
-        return -1;
-    }
+  if (comp_id < 0) {
+    rtapi_print("\n!!! %s setup failed res=%d\n\n", __FILE__, res);
+    return -1;
+  }
+  if (hal_set_unready(comp_id)) {
+    rtapi_print("\n!!! hal_set_unready failed\n");
+    return -1;
+  }
 
-    haldata = hal_malloc(sizeof(struct haldata));
-    if (!haldata) {
-        rtapi_print("\n!!!hal_malloc failed\n");
-        return -1;
-    }
+  haldata = hal_malloc(sizeof(struct haldata));
+  if (!haldata) {
+    rtapi_print("\n!!!hal_malloc failed\n");
+    return -1;
+  }
 
-    res += hal_pin_u32_newf(HAL_IN, &(haldata->in), comp_id, "%s.in", HAL_PREFIX);
-    res += hal_pin_u32_newf(HAL_OUT, &(haldata->out), comp_id, "%s.out", HAL_PREFIX);
+  res += hal_pin_u32_newf(HAL_IN, &(haldata->in), comp_id, "%s.in", HAL_PREFIX);
+  res +=
+      hal_pin_u32_newf(HAL_OUT, &(haldata->out), comp_id, "%s.out", HAL_PREFIX);
 
-    res += hal_param_float_newf(
-        HAL_RW,
-        &haldata->param_rw,
-        comp_id,
-        "%s.param-rw",
-        HAL_PREFIX);
-    res += hal_param_float_newf(
-        HAL_RO,
-        &haldata->param_ro,
-        comp_id,
-        "%s.param-ro",
-        HAL_PREFIX);
+  res += hal_param_float_newf(HAL_RW, &haldata->param_rw, comp_id,
+                              "%s.param-rw", HAL_PREFIX);
+  res += hal_param_float_newf(HAL_RO, &haldata->param_ro, comp_id,
+                              "%s.param-ro", HAL_PREFIX);
 
-    if (!res) {
-        hal_ready(comp_id);
-        rtapi_print("*** %s setup ok\n",__FILE__);
-        return 0;
-    } else {
-        rtapi_print("\n!!! %s setup failed res=%d\n\n",__FILE__,res);
-        return -1;
-    }
+  if (!res) {
+    hal_ready(comp_id);
+    rtapi_print("*** %s setup ok\n", __FILE__);
+    return 0;
+  } else {
+    rtapi_print("\n!!! %s setup failed res=%d\n\n", __FILE__, res);
+    return -1;
+  }
 }
 
 KINS_NOT_SWITCHABLE
@@ -196,25 +200,22 @@ EXPORT_SYMBOL(kinematicsForward);
 EXPORT_SYMBOL(kinematicsInverse);
 
 KINEMATICS_TYPE kinematicsType() {
-    static bool is_setup=0;
-    if (!is_setup) {
-	    cablekins_setup();
-	}
+  static bool is_setup = 0;
+  if (!is_setup) {
+    cablekins_setup();
+  }
 
-    return KINEMATICS_INVERSE_ONLY;
+  return KINEMATICS_INVERSE_ONLY;
 }
 
 /*
  * When kinematicsType() returns KINEMATICS_INVERSE_ONLY, LinuxCNC
  * never calls kinematicsForward(), but it must still be defined.
  */
-int kinematicsForward(
-    const double *j,
-    EmcPose *pos,
-    const KINEMATICS_FORWARD_FLAGS *fflags,
-    KINEMATICS_INVERSE_FLAGS *iflags) {
-    
-    return 0;
+int kinematicsForward(const double *j, EmcPose *pos,
+                      const KINEMATICS_FORWARD_FLAGS *fflags,
+                      KINEMATICS_INVERSE_FLAGS *iflags) {
+  return 0;
 }
 
 /*
@@ -227,9 +228,9 @@ int kinematicsForward(
     double thetaL = 1.0;
     double thetaR = 1.0;
 
-	int iterations = MAX_ITERATIONS;
+        int iterations = MAX_ITERATIONS;
     while (iterations) {
-		iterations -= 1;
+                iterations -= 1;
 
         double f1 = calcF1(thetaL, thetaR);
         double f2 = calcF2(thetaL, thetaR);
@@ -256,9 +257,9 @@ int kinematicsForward(
             pos->tran.z = 0.0;
 
             rtapi_print(
-                "Converged: ThetaL = %f, ThetaR = %f\n", thetaL * 180 / M_PI, thetaR * 180 / M_PI);
-            rtapi_print(
-                "Coordinates of convergence: X = %f, Y = %f\n", X, Y);
+                "Converged: ThetaL = %f, ThetaR = %f\n", thetaL * 180 / M_PI,
+thetaR * 180 / M_PI); rtapi_print( "Coordinates of convergence: X = %f, Y =
+%f\n", X, Y);
 
             return 0;
         }
@@ -266,50 +267,52 @@ int kinematicsForward(
 }
  */
 
-int kinematicsInverse(
-	const EmcPose *pos,
-	double *j,
-	const KINEMATICS_INVERSE_FLAGS *iflags,
-	KINEMATICS_FORWARD_FLAGS *fflags) {
+int kinematicsInverse(const EmcPose *pos, double *j,
+                      const KINEMATICS_INVERSE_FLAGS *iflags,
+                      KINEMATICS_FORWARD_FLAGS *fflags) {
+  double x_target = pos->tran.x;
+  double y_target = pos->tran.y;
 
-    double x_target = pos->tran.x;
-    double y_target = pos->tran.y;
+  double distance_left_drum_center_to_target =
+      sqrt(pow(LEFT_DRUM_X - x_target, 2) + pow(LEFT_DRUM_Y - y_target, 2));
 
-    double distance_left_drum_center_to_target = sqrt(pow(LEFT_DRUM_X - x_target, 2) + pow(LEFT_DRUM_Y - y_target, 2));
+  double distance_right_drum_center_to_target =
+      sqrt(pow(RIGHT_DRUM_X - x_target, 2) + pow(RIGHT_DRUM_Y - y_target, 2));
 
-    double distance_right_drum_center_to_target = sqrt(pow(RIGHT_DRUM_X - x_target, 2) + pow(RIGHT_DRUM_Y - y_target, 2));
+  double left_tangent_length_to_target = sqrt(
+      pow(distance_left_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2));
+  double right_tangent_length_to_target = sqrt(
+      pow(distance_right_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2));
 
-    double left_tangent_length_to_target = sqrt(pow(distance_left_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2));
-    double right_tangent_length_to_target = sqrt(pow(distance_right_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2));
+  double theta1_left = atan(x_target / y_target);
+  double theta2_left =
+      atan((DRUM_DIAMETER / 2) / left_tangent_length_to_target);
+  double theta_left = theta1_left + theta2_left;
 
-    double theta1_left = atan(x_target / y_target); // Corrected sign
-    double theta2_left = atan((DRUM_DIAMETER / 2) / left_tangent_length_to_target);
-    double theta_left = theta1_left + theta2_left;
+  double theta1_right =
+      atan((RIGHT_DRUM_X - x_target) / (y_target - RIGHT_DRUM_Y));
+  double theta2_right =
+      atan((DRUM_DIAMETER / 2) / right_tangent_length_to_target);
+  double theta_right = theta1_right + theta2_right;
 
-    double theta1_right = atan((RIGHT_DRUM_X - x_target) / (y_target - RIGHT_DRUM_Y));
-    double theta2_right = atan((DRUM_DIAMETER / 2) / right_tangent_length_to_target);
-    double theta_right = theta1_right + theta2_right;
+  double left_arc_length = theta_left * (DRUM_DIAMETER / 2);
+  double right_arc_length = theta_right * (DRUM_DIAMETER / 2);
 
+  double left_cable_length_to_target =
+      left_tangent_length_to_target + left_arc_length;
+  double right_cable_length_to_target =
+      right_tangent_length_to_target + right_arc_length;
 
-    double left_arc_length = theta_left * (DRUM_DIAMETER / 2);
-    double right_arc_length = theta_right * (DRUM_DIAMETER / 2);
+  double left_cable_length_change =
+      LEFT_CABLE_HOME_LENGTH - left_cable_length_to_target;
+  double right_cable_length_change =
+      RIGHT_CABLE_HOME_LENGTH - right_cable_length_to_target;
 
-    double left_cable_length_to_target = left_tangent_length_to_target + left_arc_length;
-    double right_cable_length_to_target = right_tangent_length_to_target + right_arc_length;
+  j[0] = left_cable_length_change;
+  j[1] = right_cable_length_change;
+  rtapi_print_msg(RTAPI_MSG_ERR, "kinematicsInverse joints: %d, %d, %d, %d\n",
+                  distance_left_drum_center_to_target,
+                  left_tangent_length_to_target, left_arc_length, j[0]);
 
-    double left_cable_length_change = LEFT_CABLE_HOME_LENGTH - left_cable_length_to_target;
-    double right_cable_length_change = RIGHT_CABLE_HOME_LENGTH - right_cable_length_to_target;
-
-    j[0] = left_cable_length_change;
-    j[1] = right_cable_length_change;
-    rtapi_print_msg(
-        RTAPI_MSG_ERR,
-        "kinematicsInverse joints: %d, %d, %d, %d\n",
-        distance_left_drum_center_to_target,
-        left_tangent_length_to_target,
-        left_arc_length,
-        j[0]
-    );
-
-    return 0;
+  return 0;
 }
