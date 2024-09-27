@@ -60,8 +60,13 @@ author "Dave Franchino";
 
 #include "kinematics.h"
 #include "rtapi_math.h"
+#include "rtapi.h"   // Include for rtapi_print and rtapi_vprint
+#include <stdarg.h>  // Include for handling variable arguments
 
 #define HAL_PREFIX "cablekins"
+
+// Define a global debug flag
+int debug_print = 1; // Set to 1 (true) to enable debugging, 0 (false) to disable
 
 /*
  * An upper limit on the quantity of iterations through the X function.
@@ -80,6 +85,17 @@ author "Dave Franchino";
 
 #define LEFT_CABLE_HOME_LENGTH 296.237
 #define RIGHT_CABLE_HOME_LENGTH 531.375
+
+ // Function for debug printing
+void debugPrint(const char* format, ...) {
+    if (debug_print) {
+        va_list args;
+        va_start(args, format);
+        rtapi_vprint(format, args); // Use rtapi_vprint for real-time safe printing
+        va_end(args);
+    }
+}
+
 
 double calcF1(double thetaL, double thetaR) {
   double XL =
@@ -238,6 +254,19 @@ int kinematicsForward(
         double** J = calcJacobian(thetaL, thetaR);
         double** J_inv = invertMatrix(J);
 
+        if (J_inv == NULL) {
+            rtapi_print_msg(RTAPI_MSG_ERR, "Error: Jacobian matrix is not invertible\n");
+            return -1; // Return an error code if the matrix is not invertible
+        }
+
+        // Free allocated memory after use
+            hal_free(jacobian[0]);
+            hal_free(jacobian[1]);
+            hal_free(jacobian);
+            hal_free(J_inv[0]);
+            hal_free(J_inv[1]);
+            hal_free(J_inv);
+
         double deltaThetaL = J_inv[0][0] * f1 + J_inv[0][1] * f2;
         double deltaThetaR = J_inv[1][0] * f1 + J_inv[1][1] * f2;
 
@@ -279,18 +308,41 @@ int kinematicsInverse(const EmcPose *pos, double *j,
   double distance_right_drum_center_to_target =
       sqrt(pow(RIGHT_DRUM_X - x_target, 2) + pow(RIGHT_DRUM_Y - y_target, 2));
 
-  double left_tangent_length_to_target = sqrt(
-      pow(distance_left_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2));
-  double right_tangent_length_to_target = sqrt(
-      pow(distance_right_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2));
+  double left_tangent_length_to_target = sqrt(fabs(
+      pow(distance_left_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2)));
+  double right_tangent_length_to_target = sqrt(fabs(
+      pow(distance_right_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2)));
 
-  double theta1_left = -atan((LEFT_DRUM_X-x_target) / (LEFT_DRUM_Y - y_target));
+  // Check for division by zero
+  if (y_target != LEFT_DRUM_Y) {
+      // Normal calculation
+     double theta1_left = -atan((LEFT_DRUM_X - x_target) / (LEFT_DRUM_Y - y_target));
+  }
+  else {
+      // Handle division by zero case
+      rtapi_print_msg(RTAPI_MSG_WARN, "Warning: Division by zero in theta1_left calculation. Setting theta1_left to NAN.\n");
+      theta1_left = NAN; // Fallback value
+  }
+
+
+
   double theta2_left =
       atan((DRUM_DIAMETER / 2) / left_tangent_length_to_target);
   double theta_left = theta1_left + theta2_left;
 
-  double theta1_right =
-      atan((RIGHT_DRUM_X - x_target) / (y_target - RIGHT_DRUM_Y));
+  // Calculate theta1_right with error handling for division by zero
+  if (y_target != RIGHT_DRUM_Y) {
+      // Normal calculation for theta1_right
+      double theta1_right = atan((RIGHT_DRUM_X - x_target) / (y_target - RIGHT_DRUM_Y));
+  }
+  else {
+      // Handle division by zero case
+      rtapi_print_msg(RTAPI_MSG_WARN, "Warning: Division by zero in theta1_right calculation. Setting theta1_right to NAN.\n");
+      theta1_right = NAN; // Fallback value
+  }
+
+
+
   double theta2_right =
       atan((DRUM_DIAMETER / 2) / right_tangent_length_to_target);
   double theta_right = theta1_right + theta2_right;
@@ -310,9 +362,25 @@ int kinematicsInverse(const EmcPose *pos, double *j,
 
   j[0] = left_cable_length_change;
   j[1] = right_cable_length_change;
-  rtapi_print_msg(RTAPI_MSG_ERR, "kinematicsInverse joints: %d, %d, %d, %d\n",
-                  distance_left_drum_center_to_target,
-                  left_tangent_length_to_target, left_arc_length, j[0]);
+
+  // Print all the calculated values if debug_print is enabled
+  debugPrint("Debug: x_target = %f, y_target = %f\n", x_target, y_target);
+  debugPrint("Debug: distance_left_drum_center_to_target = %f, distance_right_drum_center_to_target = %f\n",
+      distance_left_drum_center_to_target, distance_right_drum_center_to_target);
+  debugPrint("Debug: left_tangent_length_to_target = %f, right_tangent_length_to_target = %f\n",
+      left_tangent_length_to_target, right_tangent_length_to_target);
+  debugPrint("Debug: theta1_left = %f, theta2_left = %f, theta_left = %f\n",
+      theta1_left, theta2_left, theta_left);
+  debugPrint("Debug: theta1_right = %f, theta2_right = %f, theta_right = %f\n",
+      theta1_right, theta2_right, theta_right);
+  debugPrint("Debug: left_arc_length = %f, right_arc_length = %f\n",
+      left_arc_length, right_arc_length);
+  debugPrint("Debug: left_cable_length_to_target = %f, right_cable_length_to_target = %f\n",
+      left_cable_length_to_target, right_cable_length_to_target);
+  debugPrint("Debug: left_cable_length_change = %f, right_cable_length_change = %f\n",
+      left_cable_length_change, right_cable_length_change);
+  debugPrint("Debug: kinematicsInverse joints: j[0] = %f, j[1] = %f\n",
+      j[0], j[1]);
 
   return 0;
 }
