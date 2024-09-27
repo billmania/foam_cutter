@@ -68,15 +68,15 @@ author "Dave Franchino";
  */
 #define MAX_ITERATIONS 10000
 
-#define LEFT_DRUM_X 0.0
-#define LEFT_DRUM_Y 0.0
-#define RIGHT_DRUM_X 500.0
-#define RIGHT_DRUM_Y 0.0
+#define LEFT_DRUM_X -100
+#define LEFT_DRUM_Y 250
+#define RIGHT_DRUM_X 400
+#define RIGHT_DRUM_Y 250
 #define DRUM_DIAMETER (360 / M_PI)
 #define DRUM_CIRCUMFERENCE 350.0
 
-#define HOME_X 100.0
-#define HOME_Y -250.0
+#define HOME_X 0
+#define HOME_Y 0
 
 #define LEFT_CABLE_HOME_LENGTH 296.237
 #define RIGHT_CABLE_HOME_LENGTH 531.375
@@ -284,7 +284,7 @@ int kinematicsInverse(const EmcPose *pos, double *j,
   double right_tangent_length_to_target = sqrt(
       pow(distance_right_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2));
 
-  double theta1_left = atan(x_target / y_target);
+  double theta1_left = -atan((LEFT_DRUM_X-x_target) / (LEFT_DRUM_Y - y_target));
   double theta2_left =
       atan((DRUM_DIAMETER / 2) / left_tangent_length_to_target);
   double theta_left = theta1_left + theta2_left;

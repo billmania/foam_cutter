@@ -1,3 +1,62 @@
+# Ignore visual studio stuff
+# Ignore Visual Studio temporary files, build results, and
+# user-specific files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Ignore build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+build/
+*.exe
+*.dll
+*.obj
+*.pdb
+*.tlb
+*.tlh
+*.bak
+*.cache
+*.ilk
+*.log
+*.log.*
+*.vspscc
+*.vssscc
+*.vspx
+*.tlog
+
+# Ignore Visual Studio Code workspace settings
+.vscode/
+
+# Ignore compiled Dynamic Libraries
+*.lib
+*.exp
+
+# Ignore static libraries
+*.lib
+
+# Ignore precompiled headers
+*.pch
+
+# Ignore temporary files
+*.tmp
+*.temp
+
+# Ignore Windows resource files
+*.res
+*.resources
+
+# Ignore the folder for Visual Studio's image service
+Generated\ Files/
+
+# Ignore any other temporary files and build directories
+_temp/
+!_temp/*.keep
+
+
 # Prerequisites
 *.d
 
