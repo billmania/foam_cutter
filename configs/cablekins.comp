@@ -91,7 +91,7 @@ void debugPrint(const char* format, ...) {
     if (debug_print) {
         va_list args;
         va_start(args, format);
-        rtapi_vprint(format, args); // Use rtapi_vprint for real-time safe printing
+        rtapi_print(format, args); // Use rtapi_vprint for real-time safe printing
         va_end(args);
     }
 }
@@ -313,10 +313,12 @@ int kinematicsInverse(const EmcPose *pos, double *j,
   double right_tangent_length_to_target = sqrt(fabs(
       pow(distance_right_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2)));
 
+  double theta1_left
+
   // Check for division by zero
   if (y_target != LEFT_DRUM_Y) {
       // Normal calculation
-     double theta1_left = -atan((LEFT_DRUM_X - x_target) / (LEFT_DRUM_Y - y_target));
+     theta1_left = -atan((LEFT_DRUM_X - x_target) / (LEFT_DRUM_Y - y_target));
   }
   else {
       // Handle division by zero case
@@ -324,7 +326,7 @@ int kinematicsInverse(const EmcPose *pos, double *j,
       theta1_left = NAN; // Fallback value
   }
 
-
+  double theta1_right
 
   double theta2_left =
       atan((DRUM_DIAMETER / 2) / left_tangent_length_to_target);
@@ -333,7 +335,7 @@ int kinematicsInverse(const EmcPose *pos, double *j,
   // Calculate theta1_right with error handling for division by zero
   if (y_target != RIGHT_DRUM_Y) {
       // Normal calculation for theta1_right
-      double theta1_right = atan((RIGHT_DRUM_X - x_target) / (y_target - RIGHT_DRUM_Y));
+      theta1_right = atan((RIGHT_DRUM_X - x_target) / (y_target - RIGHT_DRUM_Y));
   }
   else {
       // Handle division by zero case
