@@ -1,0 +1,14 @@
+General compiles:
+	https://www.cyberciti.biz/faq/howto-compile-and-run-c-cplusplus-code-in-linux/
+
+Shared libraries:
+	https://www.cprogramming.com/tutorial/shared-libraries-linux-gcc.html
+
+1. gcc -c -I/usr/include/linuxcnc -Wall -Werror -fpic foo.c
+2. gcc -shared -o libfoo.so foo.o
+3. gcc -L. -Wall -o test main.c -lfoo
+4. export LD_LIBRARY_PATH=.
+5. ./test
+
+LinuxCNC compile:
+	halcompile --compile cablekins.comp
