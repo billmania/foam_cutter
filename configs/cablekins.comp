@@ -334,7 +334,7 @@ int kinematicsInverse(const EmcPose *pos, double *j,
   // Calculate theta1_right with error handling for division by zero
   if (y_target != RIGHT_DRUM_Y) {
       // Normal calculation for theta1_right
-      stheta1_right = atan((RIGHT_DRUM_X - x_target) / (y_target - RIGHT_DRUM_Y));
+      theta1_right = atan((RIGHT_DRUM_X - x_target) / (y_target - RIGHT_DRUM_Y));
   }
   else {
       // Handle division by zero case
