@@ -313,7 +313,7 @@ int kinematicsInverse(const EmcPose *pos, double *j,
   double right_tangent_length_to_target = sqrt(fabs(
       pow(distance_right_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2)));
 
-  double theta1_left
+  double theta1_left;
 
   // Check for division by zero
   if (y_target != LEFT_DRUM_Y) {
@@ -326,16 +326,15 @@ int kinematicsInverse(const EmcPose *pos, double *j,
       theta1_left = NAN; // Fallback value
   }
 
-  double theta1_right
-
   double theta2_left =
       atan((DRUM_DIAMETER / 2) / left_tangent_length_to_target);
   double theta_left = theta1_left + theta2_left;
 
+  double theta1_right;
   // Calculate theta1_right with error handling for division by zero
   if (y_target != RIGHT_DRUM_Y) {
       // Normal calculation for theta1_right
-      theta1_right = atan((RIGHT_DRUM_X - x_target) / (y_target - RIGHT_DRUM_Y));
+      stheta1_right = atan((RIGHT_DRUM_X - x_target) / (y_target - RIGHT_DRUM_Y));
   }
   else {
       // Handle division by zero case
