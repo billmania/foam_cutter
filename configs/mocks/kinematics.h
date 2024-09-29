@@ -8,14 +8,10 @@
 typedef uint32_t hal_u32_t;
 typedef float hal_float_t;
 
-extern int fpin;
-extern int comp_id;
-
 #define HAL_IN 15
 #define HAL_OUT 32
 #define HAL_RO 64
 #define HAL_RW HAL_RO | 128
-#define RTAPI_MSG_ERR 1
 #define KINS_NOT_SWITCHABLE
 
 typedef int bool;
@@ -30,4 +26,7 @@ typedef enum {
 typedef unsigned long int KINEMATICS_FORWARD_FLAGS;
 typedef unsigned long int KINEMATICS_INVERSE_FLAGS;
 
+int kinematicsForward(const double *, EmcPose *,
+                      const KINEMATICS_FORWARD_FLAGS *,
+                      KINEMATICS_INVERSE_FLAGS *);
 #endif
