@@ -2,57 +2,14 @@ component cablekins "kinematics for a cable driven robot";
 
 description
 """
-.if \\n[.g] .mso www.tmac
-
-The userkins.comp file is a template for creating kinematics that can be user-built using halcompile.
-
-The unmodified userkins component can be used as a kinematics file
-for a machine with identity kinematics for an xyz machine employing 3 joints (motors).
-
-\\fBUSAGE:\\fR
-
-  1) Copy the userkins.comp file to a user-owned directory (\\fBmydir\\fR).
-
-     Note: The userkins.comp file can be downloaded from:
-.URL https://github.com/LinuxCNC/linuxcnc/raw/2.8/src/hal/components/userkins.comp
-     where '2.8' is the branch name (use 'master' for the master branch)
-
-     For a RIP (run-in-place) build, the file is located in
-     the git tree as:
-       src/hal/components/userkins.comp
-
-  2) Edit the functions kinematicsForward() and kinematicsInverse() as required.
-  3) If required, add HAL pins following examples in the template code.
-  4) Build and install the component using halcompile:
-     $ cd \\fBmydir\\fR
-     $ [sudo] halcompile --install cablekins.comp
-#Note:
-#sudo is required when using a deb install
-#sudo is \\fBnot\\fR required for run - in - place builds
-#$ man halcompile for more info
-  5) Specify cablekins in an ini file as:
-     \\fB[KINS]\\fR
-     \\fBKINEMATICS=cablekins\\fR
-     \\fBJOINTS=2\\fR
-#the number of JOINTS must agree with the
-#number of joints used in your modified cablekins.comp
-  6) Note: the manpage for cablekins is not updated by halcompile --install
-  7) To use a different component name, rename the file (example mykins.comp)
-     and change all instances of 'userkins' to 'mykins'.
-
-\\fBNOTES:\\fR
-  1  The \\fBfpin\\fR pin is included to satisfy the requirements of the
-     halcompile utility but it is not accessible to kinematics functions.
-
-  2  HAL pins and parameters needed in kinematics functions (kinematicsForward(),
-     kinematicsInverse()) must be setup in a function (\\fBuserkins_setup()\\fR)
-     invoked by the initial motion module call to kinematicsType().
+Custom Kinematics file for a 2 - axis cable robot
+Written by Dave Franchino and Bill Mania
 """;
 // The fpin pin is not accessible in kinematics functions.
 // Use the *_setup() function for pins and params used by kinematics.
 
 
-pin out s32 fpin=0"pin to demonstrate use of a conventional (non-kinematics) function fdemo";
+pin out s32 fpin = 0"pin to demonstrate use of a conventional (non-kinematics) function fdemo";
 function fdemo;
 license "GPL";
 author "Dave Franchino";
@@ -69,144 +26,213 @@ author "Dave Franchino";
 int debug_print = 1; // Set to 1 (true) to enable debugging, 0 (false) to disable
 
 /*
- * An upper limit on the quantity of iterations through the X function.
+ * An upper limit on the quantity of iterations through the Newton-Raphison function for Forward Kinematics.
  */
-#define MAX_ITERATIONS 10000
+#define MAX_ITERATIONS 1000
 
-#define LEFT_DRUM_X -100
-#define LEFT_DRUM_Y 250
-#define RIGHT_DRUM_X 400
-#define RIGHT_DRUM_Y 250
-#define DRUM_DIAMETER (360 / M_PI)
-#define DRUM_CIRCUMFERENCE 350.0
+// locations for geometry 
+const double LEFT_DRUM_X = -100.0;
+const double LEFT_DRUM_Y = 250.0;
+const double RIGHT_DRUM_X = 400.0;
+const double RIGHT_DRUM_Y = 250.0;
+const double DRUM_DIAMETER = (350.0 / M_PI); // Ensure floating-point division
 
-#define HOME_X 0
-#define HOME_Y 0
+
+
+/*
+ * Define the known lengths of the two cables from "Home" to x=0, y=0 - defined as 9:00 on the left drum and 3:00 on the right drum.
+ * these are taken from a CAD model and are inputs to the forward transformation and used in as constants in the inverse transformation 
+ */
 
 #define LEFT_CABLE_HOME_LENGTH 296.237
 #define RIGHT_CABLE_HOME_LENGTH 531.375
 
- // Function for debug printing
-void debugPrint(const char* format, ...) {
-    if (debug_print) {
-        va_list args;
-        va_start(args, format);
-        rtapi_print(format, args); // Use rtapi_vprint for real-time safe printing
-        va_end(args);
-    }
-}
-
+ /*
+  * calcF1 determines the X values for the left and right drum based on the cable length and the "guess" at theta L and R. 
+  * it returns to difference between X left and X right.  Convergence is reached when X left and X right are identical.  
+  */
 
 double calcF1(double thetaL, double thetaR) {
-  double XL =
-      LEFT_DRUM_X - cos(thetaL) * DRUM_DIAMETER / 2 +
-      (LEFT_CABLE_HOME_LENGTH - thetaL * DRUM_DIAMETER / 2) * sin(thetaL);
-  double XR =
-      RIGHT_DRUM_X + cos(thetaR) * DRUM_DIAMETER / 2 -
-      (RIGHT_CABLE_HOME_LENGTH - thetaR * DRUM_DIAMETER / 2) * sin(thetaR);
-  return XL - XR;
+	double XL =
+		LEFT_DRUM_X - cos(thetaL) * DRUM_DIAMETER / 2 +
+		(LEFT_CABLE_HOME_LENGTH - thetaL * DRUM_DIAMETER / 2) * sin(thetaL);
+	double XR =
+		RIGHT_DRUM_X + cos(thetaR) * DRUM_DIAMETER / 2 -
+		(RIGHT_CABLE_HOME_LENGTH - thetaR * DRUM_DIAMETER / 2) * sin(thetaR);
+	return XL - XR;
 }
+
+/*
+ * calcF1 determines the Y values for the left and right drum based on the cable length and the "guess" at theta L and R.
+ * it returns to difference between Y left and Y right.  Convergence is reached when X left and X right are identical.
+ */
 
 double calcF2(float thetaL, float thetaR) {
-  double YL =
-      LEFT_DRUM_Y - sin(thetaL) * DRUM_DIAMETER / 2 -
-      (LEFT_CABLE_HOME_LENGTH - thetaL * DRUM_DIAMETER / 2) * cos(thetaL);
-  double YR =
-      RIGHT_DRUM_Y - sin(thetaR) * DRUM_DIAMETER / 2 -
-      (RIGHT_CABLE_HOME_LENGTH - thetaR * DRUM_DIAMETER / 2) * cos(thetaR);
-  return YL - YR;
+	double YL =
+		LEFT_DRUM_Y - sin(thetaL) * DRUM_DIAMETER / 2 -
+		(LEFT_CABLE_HOME_LENGTH - thetaL * DRUM_DIAMETER / 2) * cos(thetaL);
+	double YR =
+		RIGHT_DRUM_Y - sin(thetaR) * DRUM_DIAMETER / 2 -
+		(RIGHT_CABLE_HOME_LENGTH - thetaR * DRUM_DIAMETER / 2) * cos(thetaR);
+	return YL - YR;
 }
 
-double **calcJacobian(double thetaL, double thetaR) {
-  double **jacobian = hal_malloc(2 * sizeof(double *));
-  jacobian[0] = hal_malloc(2 * sizeof(double));
-  jacobian[1] = hal_malloc(2 * sizeof(double));
+/*
+ * Function: calcJacobian
+ * ----------------------
+ * This function computes the Jacobian matrix for a 2-axis cable-driven robot system.
+ *
+ * The Jacobian matrix relates the partial derivatives of the functions F1 and F2 with respect to the angles thetaL and thetaR
+ * (which represent the angles of the left and right drums in the cable robot).
+ *
+ * The Jacobian is a 2x2 matrix with the following structure:
+ *      | dF1/dThetaL  dF1/dThetaR |
+ *      | dF2/dThetaL  dF2/dThetaR |
+ *
+ * The derivatives are calculated numerically using finite differences with a small perturbation (0.0001) to the angles.
+ *
+ * Parameters:
+ * - thetaL: The angle of the left drum (in radians).
+ * - thetaR: The angle of the right drum (in radians).
+ *
+ * Returns:
+ * - A pointer to a dynamically allocated 2x2 matrix (the Jacobian), where:
+ *   - jacobian[0][0] = dF1/dThetaL
+ *   - jacobian[0][1] = dF1/dThetaR
+ *   - jacobian[1][0] = dF2/dThetaL
+ *   - jacobian[1][1] = dF2/dThetaR
+ *
+ * Notes:
+ * - The Jacobian matrix is computed using the numerical derivative of the F1 and F2 functions with respect to the angles.
+ * - The caller is responsible for freeing the allocated memory for the Jacobian matrix.
+ */
 
-  double dF1dThetaL =
-      (calcF1(thetaL + 0.0001, thetaR) - calcF1(thetaL, thetaR)) / 0.0001;
-  double dF1dThetaR =
-      (calcF1(thetaL, thetaR + 0.0001) - calcF1(thetaL, thetaR)) / 0.0001;
-  double dF2dThetaL =
-      (calcF2(thetaL + 0.0001, thetaR) - calcF2(thetaL, thetaR)) / 0.0001;
-  double dF2dThetaR =
-      (calcF2(thetaL, thetaR + 0.0001) - calcF2(thetaL, thetaR)) / 0.0001;
 
-  jacobian[0][0] = dF1dThetaL;
-  jacobian[0][1] = dF1dThetaR;
-  jacobian[1][0] = dF2dThetaL;
-  jacobian[1][1] = dF2dThetaR;
+double** calcJacobian(double thetaL, double thetaR) {
+	double** jacobian = hal_malloc(2 * sizeof(double*));
+	jacobian[0] = hal_malloc(2 * sizeof(double));
+	jacobian[1] = hal_malloc(2 * sizeof(double));
 
-  return jacobian;
+	double dF1dThetaL =
+		(calcF1(thetaL + 0.0001, thetaR) - calcF1(thetaL, thetaR)) / 0.0001;
+	double dF1dThetaR =
+		(calcF1(thetaL, thetaR + 0.0001) - calcF1(thetaL, thetaR)) / 0.0001;
+	double dF2dThetaL =
+		(calcF2(thetaL + 0.0001, thetaR) - calcF2(thetaL, thetaR)) / 0.0001;
+	double dF2dThetaR =
+		(calcF2(thetaL, thetaR + 0.0001) - calcF2(thetaL, thetaR)) / 0.0001;
+
+	jacobian[0][0] = dF1dThetaL;
+	jacobian[0][1] = dF1dThetaR;
+	jacobian[1][0] = dF2dThetaL;
+	jacobian[1][1] = dF2dThetaR;
+
+	return jacobian;
 }
 
-double **invertMatrix(double **m) {
-  double **invertedMatrix = hal_malloc(2 * sizeof(double *));
-  invertedMatrix[0] = hal_malloc(2 * sizeof(double));
-  invertedMatrix[1] = hal_malloc(2 * sizeof(double));
 
-  double det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
+/*
+ * Function: invertMatrix
+ * ----------------------
+ * This function computes the inverse of a 2x2 matrix.
+ *
+ * The matrix inversion is performed using the formula for the inverse of a 2x2 matrix:
+ *
+ * Given a matrix:
+ *      | a  b |
+ *      | c  d |
+ *
+ * The inverse is:
+ *      1      |  d  -b |
+ *     ---  *  | -c   a |
+ *      det
+ *
+ * where the determinant (det) is calculated as:
+ *      det = (a * d) - (b * c)
+ *
+ * If the determinant is zero, the function returns NULL, indicating that the matrix is singular and cannot be inverted.
+ *
+ * Parameters:
+ * - m: A pointer to a 2x2 matrix to be inverted.
+ *
+ * Returns:
+ * - A pointer to the dynamically allocated 2x2 inverted matrix if the determinant is non-zero.
+ * - NULL if the matrix is singular (i.e., determinant is zero and the matrix cannot be inverted).
+ *
+ * Notes:
+ * - The function uses dynamic memory allocation for the inverted matrix, and it is the caller's responsibility to free the memory.
+ * - The function assumes that the input matrix `m` is a 2x2 matrix.
+ */
 
-  if (det == 0.0) {
-    return NULL;
-  }
+double** invertMatrix(double** m) {
+	double** invertedMatrix = hal_malloc(2 * sizeof(double*));
+	invertedMatrix[0] = hal_malloc(2 * sizeof(double));
+	invertedMatrix[1] = hal_malloc(2 * sizeof(double));
 
-  invertedMatrix[0][0] = m[1][1] / det;
-  invertedMatrix[0][1] = -m[0][1] / det;
-  invertedMatrix[1][0] = -m[1][0] / det;
-  invertedMatrix[1][1] = m[0][0] / det;
+	double det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
 
-  return invertedMatrix;
+	if (det == 0.0) {
+		return NULL;
+	}
+
+	invertedMatrix[0][0] = m[1][1] / det;
+	invertedMatrix[0][1] = -m[0][1] / det;
+	invertedMatrix[1][0] = -m[1][0] / det;
+	invertedMatrix[1][1] = m[0][0] / det;
+
+	return invertedMatrix;
 }
 
 static struct haldata {
-  hal_u32_t *in;
-  hal_u32_t *out;
-  hal_float_t param_rw;
-  hal_float_t param_ro;
-} * haldata;
+	hal_u32_t* in;
+	hal_u32_t* out;
+	hal_float_t param_rw;
+	hal_float_t param_ro;
+} *haldata;
 
 FUNCTION(fdemo) {
-  if (fpin == 0) {
-    rtapi_print("fdemo function added to thread\n");
-  }
-  fpin++;
+	if (fpin == 0) {
+		rtapi_print("fdemo function added to thread\n");
+	}
+	fpin++;
 }
 
 static int cablekins_setup(void) {
-  int res = 0;
+	int res = 0;
 
-  if (comp_id < 0) {
-    rtapi_print("\n!!! %s setup failed res=%d\n\n", __FILE__, res);
-    return -1;
-  }
-  if (hal_set_unready(comp_id)) {
-    rtapi_print("\n!!! hal_set_unready failed\n");
-    return -1;
-  }
+	if (comp_id < 0) {
+		rtapi_print("\n!!! %s setup failed res=%d\n\n", __FILE__, res);
+		return -1;
+	}
+	if (hal_set_unready(comp_id)) {
+		rtapi_print("\n!!! hal_set_unready failed\n");
+		return -1;
+	}
 
-  haldata = hal_malloc(sizeof(struct haldata));
-  if (!haldata) {
-    rtapi_print("\n!!!hal_malloc failed\n");
-    return -1;
-  }
+	haldata = hal_malloc(sizeof(struct haldata));
+	if (!haldata) {
+		rtapi_print("\n!!!hal_malloc failed\n");
+		return -1;
+	}
 
-  res += hal_pin_u32_newf(HAL_IN, &(haldata->in), comp_id, "%s.in", HAL_PREFIX);
-  res +=
-      hal_pin_u32_newf(HAL_OUT, &(haldata->out), comp_id, "%s.out", HAL_PREFIX);
+	res += hal_pin_u32_newf(HAL_IN, &(haldata->in), comp_id, "%s.in", HAL_PREFIX);
+	res +=
+		hal_pin_u32_newf(HAL_OUT, &(haldata->out), comp_id, "%s.out", HAL_PREFIX);
 
-  res += hal_param_float_newf(HAL_RW, &haldata->param_rw, comp_id,
-                              "%s.param-rw", HAL_PREFIX);
-  res += hal_param_float_newf(HAL_RO, &haldata->param_ro, comp_id,
-                              "%s.param-ro", HAL_PREFIX);
+	res += hal_param_float_newf(HAL_RW, &haldata->param_rw, comp_id,
+		"%s.param-rw", HAL_PREFIX);
+	res += hal_param_float_newf(HAL_RO, &haldata->param_ro, comp_id,
+		"%s.param-ro", HAL_PREFIX);
 
-  if (!res) {
-    hal_ready(comp_id);
-    rtapi_print("*** %s setup ok\n", __FILE__);
-    return 0;
-  } else {
-    rtapi_print("\n!!! %s setup failed res=%d\n\n", __FILE__, res);
-    return -1;
-  }
+	if (!res) {
+		hal_ready(comp_id);
+		rtapi_print("*** %s setup ok\n", __FILE__);
+		return 0;
+	}
+	else {
+		rtapi_print("\n!!! %s setup failed res=%d\n\n", __FILE__, res);
+		return -1;
+	}
 }
 
 KINS_NOT_SWITCHABLE
@@ -216,172 +242,209 @@ EXPORT_SYMBOL(kinematicsForward);
 EXPORT_SYMBOL(kinematicsInverse);
 
 KINEMATICS_TYPE kinematicsType() {
-  static bool is_setup = 0;
-  if (!is_setup) {
-    cablekins_setup();
-  }
+	static bool is_setup = 0;
+	if (!is_setup) {
+		cablekins_setup();
+	}
 
-  return KINEMATICS_INVERSE_ONLY;
+	return KINEMATICS_INVERSE_ONLY;
 }
 
 /*
  * When kinematicsType() returns KINEMATICS_INVERSE_ONLY, LinuxCNC
  * never calls kinematicsForward(), but it must still be defined.
  */
-int kinematicsForward(const double *j, EmcPose *pos,
-                      const KINEMATICS_FORWARD_FLAGS *fflags,
-                      KINEMATICS_INVERSE_FLAGS *iflags) {
-  return 0;
-}
 
-/*
+
 int kinematicsForward(
-    const double *j,
-    EmcPose *pos,
-    const KINEMATICS_FORWARD_FLAGS *fflags,
-    KINEMATICS_INVERSE_FLAGS *iflags) {
+	const double* j,
+	EmcPose * pos,
+	const KINEMATICS_FORWARD_FLAGS * fflags,
+	KINEMATICS_INVERSE_FLAGS * iflags) {
 
-    double thetaL = 1.0;
-    double thetaR = 1.0;
+	rtapi_print("In kinematics forward");
+	pos->tran.x = 0;
+	pos->tran.y = 0;
 
-        int iterations = MAX_ITERATIONS;
-    while (iterations) {
-                iterations -= 1;
+	double thetaL = .78;
+	double thetaR = .78;
 
-        double f1 = calcF1(thetaL, thetaR);
-        double f2 = calcF2(thetaL, thetaR);
+	int iterations = MAX_ITERATIONS;
+	while (iterations) {
+		iterations -= 1;
 
-        double** J = calcJacobian(thetaL, thetaR);
-        double** J_inv = invertMatrix(J);
+		double f1 = calcF1(thetaL, thetaR);
+		double f2 = calcF2(thetaL, thetaR);
 
-        if (J_inv == NULL) {
-            rtapi_print_msg(RTAPI_MSG_ERR, "Error: Jacobian matrix is not invertible\n");
-            return -1; // Return an error code if the matrix is not invertible
-        }
+		double** J = calcJacobian(thetaL, thetaR);
+		double** J_inv = invertMatrix(J);
 
-        // Free allocated memory after use
-            hal_free(jacobian[0]);
-            hal_free(jacobian[1]);
-            hal_free(jacobian);
-            hal_free(J_inv[0]);
-            hal_free(J_inv[1]);
-            hal_free(J_inv);
+		if (J_inv == NULL) {
+			rtapi_print_msg(RTAPI_MSG_ERR, "Error: Jacobian matrix is not invertible\n");
+			return -1; // Return an error code if the matrix is not invertible
+		}
 
-        double deltaThetaL = J_inv[0][0] * f1 + J_inv[0][1] * f2;
-        double deltaThetaR = J_inv[1][0] * f1 + J_inv[1][1] * f2;
+		double deltaThetaL = J_inv[0][0] * f1 + J_inv[0][1] * f2;
+		double deltaThetaR = J_inv[1][0] * f1 + J_inv[1][1] * f2;
 
-        thetaL -= deltaThetaL;
-        thetaR -= deltaThetaR;
+		thetaL -= deltaThetaL;
+		thetaR -= deltaThetaR;
 
-        double arcL = thetaL * DRUM_DIAMETER / 2;
-        double tangentL = LEFT_CABLE_HOME_LENGTH - arcL;
-        double tangentxL = LEFT_DRUM_X - cos(thetaL) * DRUM_DIAMETER / 2;
-        double tangentyL = LEFT_DRUM_Y- sin(thetaL) * DRUM_DIAMETER / 2;
-        double X = tangentxL + tangentL * sin(thetaL);
-        double Y = tangentyL - tangentL * cos(thetaL);
+		double arcL = thetaL * DRUM_DIAMETER / 2;
+		double tangentL = LEFT_CABLE_HOME_LENGTH - arcL;
+		double tangentxL = LEFT_DRUM_X - cos(thetaL) * DRUM_DIAMETER / 2;
+		double tangentyL = LEFT_DRUM_Y - sin(thetaL) * DRUM_DIAMETER / 2;
+		double X = tangentxL + tangentL * sin(thetaL);
+		double Y = tangentyL - tangentL * cos(thetaL);
 
-        if (fabs(deltaThetaL) < 0.0001 && fabs(deltaThetaR) < 0.0001) {
-            pos->tran.x = X;
-            pos->tran.y = Y;
-            pos->tran.z = 0.0;
+		if (fabs(deltaThetaL) < 0.00001 && fabs(deltaThetaR) < 0.00001) {
+			pos->tran.x = X;
+			pos->tran.y = Y;
+			pos->tran.z = 0.0;
 
-            rtapi_print(
-                "Converged: ThetaL = %f, ThetaR = %f\n", thetaL * 180 / M_PI,
-thetaR * 180 / M_PI); rtapi_print( "Coordinates of convergence: X = %f, Y =
-%f\n", X, Y);
+			if (debug_print) {
+				// Print the final theta values for both left and right drums
+				rtapi_print("Debug: Converged - ThetaL = %f, ThetaR = %f\n", thetaL * 180 / M_PI, thetaR * 180 / M_PI);
 
-            return 0;
-        }
-    }
+				// Print the number of iterations taken to converge
+				rtapi_print("Debug: Iterations to converge = %d\n", iterations);
+
+				// Print the arc length for both left and right drums
+				rtapi_print("Debug: LEFT arc length = %f, RIGHT arc length = %f\n",
+					thetaL * DRUM_DIAMETER / 2, thetaR * DRUM_DIAMETER / 2);
+
+				// Print the tangent lengths for both drums
+				rtapi_print("Debug: LEFT tangent length = %f, RIGHT tangent length = %f\n",
+					LEFT_CABLE_HOME_LENGTH - (thetaL * DRUM_DIAMETER / 2),
+					RIGHT_CABLE_HOME_LENGTH - (thetaR * DRUM_DIAMETER / 2));
+
+				// Print the X and Y coordinates of the left drum after convergence
+				rtapi_print("Debug: LEFT drum coordinates after convergence - X = %f, Y = %f\n",
+					LEFT_DRUM_X - cos(thetaL) * DRUM_DIAMETER / 2,
+					LEFT_DRUM_Y - sin(thetaL) * DRUM_DIAMETER / 2);
+
+				// Print the X and Y coordinates of the right drum after convergence
+				rtapi_print("Debug: RIGHT drum coordinates after convergence - X = %f, Y = %f\n",
+					RIGHT_DRUM_X + cos(thetaR) * DRUM_DIAMETER / 2,
+					RIGHT_DRUM_Y - sin(thetaR) * DRUM_DIAMETER / 2);
+
+				// Print the final coordinates of the point of convergence
+				rtapi_print("Debug: Point of convergence - X = %f, Y = %f\n", X, Y);
+			}
+			return 0;
+		}
+	}
 }
- */
 
-int kinematicsInverse(const EmcPose *pos, double *j,
-                      const KINEMATICS_INVERSE_FLAGS *iflags,
-                      KINEMATICS_FORWARD_FLAGS *fflags) {
-  double x_target = pos->tran.x;
-  double y_target = pos->tran.y;
+int kinematicsInverse(const EmcPose * pos, double* j,
+	const KINEMATICS_INVERSE_FLAGS * iflags,
+	KINEMATICS_FORWARD_FLAGS * fflags) {
 
-  double distance_left_drum_center_to_target =
-      sqrt(pow(LEFT_DRUM_X - x_target, 2) + pow(LEFT_DRUM_Y - y_target, 2));
+	double x_target = pos->tran.x;
+	double y_target = pos->tran.y;
 
-  double distance_right_drum_center_to_target =
-      sqrt(pow(RIGHT_DRUM_X - x_target, 2) + pow(RIGHT_DRUM_Y - y_target, 2));
+	double LEFT_DRUM_X = -100.0;
+	double LEFT_DRUM_Y = 250.0;
 
-  double left_tangent_length_to_target = sqrt(fabs(
-      pow(distance_left_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2)));
-  double right_tangent_length_to_target = sqrt(fabs(
-      pow(distance_right_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2)));
+	//distance from center to target courtesy of Mr. Pythagorous 
+	double distance_left_drum_center_to_target =
+		sqrt(pow(LEFT_DRUM_X - x_target, 2) + pow(LEFT_DRUM_Y - y_target, 2));
 
-  double theta1_left;
+	double distance_right_drum_center_to_target =
+		sqrt(pow(RIGHT_DRUM_X - x_target, 2) + pow(RIGHT_DRUM_Y - y_target, 2));
 
-  // Check for division by zero
-  if (y_target != LEFT_DRUM_Y) {
-      // Normal calculation
-     theta1_left = -atan((LEFT_DRUM_X - x_target) / (LEFT_DRUM_Y - y_target));
-  }
-  else {
-      // Handle division by zero case
-      rtapi_print_msg(RTAPI_MSG_WARN, "Warning: Division by zero in theta1_left calculation. Setting theta1_left to NAN.\n");
-      theta1_left = NAN; // Fallback value
-  }
-
-  double theta2_left =
-      atan((DRUM_DIAMETER / 2) / left_tangent_length_to_target);
-  double theta_left = theta1_left + theta2_left;
-
-  double theta1_right;
-  // Calculate theta1_right with error handling for division by zero
-  if (y_target != RIGHT_DRUM_Y) {
-      // Normal calculation for theta1_right
-      theta1_right = atan((RIGHT_DRUM_X - x_target) / (y_target - RIGHT_DRUM_Y));
-  }
-  else {
-      // Handle division by zero case
-      rtapi_print_msg(RTAPI_MSG_WARN, "Warning: Division by zero in theta1_right calculation. Setting theta1_right to NAN.\n");
-      theta1_right = NAN; // Fallback value
-  }
+	//given the center distance we can now figure out the tangent distance - Pythagorous again 
+	double left_tangent_length_to_target = sqrt(fabs(
+		pow(distance_left_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2)));
+	double right_tangent_length_to_target = sqrt(fabs(
+		pow(distance_right_drum_center_to_target, 2) - pow(DRUM_DIAMETER / 2, 2)));
 
 
+	double theta1_left;
+	// Check for division by zero
+	if (y_target != LEFT_DRUM_Y) {
+		// Normal calculation
+		theta1_left = -atan((LEFT_DRUM_X - x_target) / (LEFT_DRUM_Y - y_target));
+	}
+	else {
+		// Handle division by zero case
+		rtapi_print_msg(RTAPI_MSG_WARN, "Warning: Division by zero in theta1_left calculation. Setting theta1_left to NAN.\n");
+		theta1_left = NAN; // Fallback value
+	}
 
-  double theta2_right =
-      atan((DRUM_DIAMETER / 2) / right_tangent_length_to_target);
-  double theta_right = theta1_right + theta2_right;
+	double theta2_left =
+		atan((DRUM_DIAMETER / 2) / left_tangent_length_to_target);
+	double theta_left = theta1_left + theta2_left;
 
-  double left_arc_length = theta_left * (DRUM_DIAMETER / 2);
-  double right_arc_length = theta_right * (DRUM_DIAMETER / 2);
+	double theta1_right;
+	// Calculate theta1_right with error handling for division by zero
+	if (y_target != RIGHT_DRUM_Y) {
+		// Normal calculation for theta1_right
+		theta1_right = -atan((RIGHT_DRUM_X - x_target) / (y_target - RIGHT_DRUM_Y));
+	}
+	else {
+		// Handle division by zero case
+		rtapi_print_msg(RTAPI_MSG_WARN, "Warning: Division by zero in theta1_right calculation. Setting theta1_right to NAN.\n");
+		theta1_right = NAN; // Fallback value
+	}
 
-  double left_cable_length_to_target =
-      left_tangent_length_to_target + left_arc_length;
-  double right_cable_length_to_target =
-      right_tangent_length_to_target + right_arc_length;
+	double theta2_right =
+		atan((DRUM_DIAMETER / 2) / right_tangent_length_to_target);
+	double theta_right = theta1_right + theta2_right;
 
-  double left_cable_length_change =
-      LEFT_CABLE_HOME_LENGTH - left_cable_length_to_target;
-  double right_cable_length_change =
-      RIGHT_CABLE_HOME_LENGTH - right_cable_length_to_target;
+	double left_arc_length = theta_left * (DRUM_DIAMETER / 2);
+	double right_arc_length = theta_right * (DRUM_DIAMETER / 2);
 
-  j[0] = left_cable_length_change;
-  j[1] = right_cable_length_change;
+	double left_cable_length_to_target =
+		left_tangent_length_to_target + left_arc_length;
+	double right_cable_length_to_target =
+		right_tangent_length_to_target + right_arc_length;
 
-  // Print all the calculated values if debug_print is enabled
-  debugPrint("Debug: x_target = %f, y_target = %f\n", x_target, y_target);
-  debugPrint("Debug: distance_left_drum_center_to_target = %f, distance_right_drum_center_to_target = %f\n",
-      distance_left_drum_center_to_target, distance_right_drum_center_to_target);
-  debugPrint("Debug: left_tangent_length_to_target = %f, right_tangent_length_to_target = %f\n",
-      left_tangent_length_to_target, right_tangent_length_to_target);
-  debugPrint("Debug: theta1_left = %f, theta2_left = %f, theta_left = %f\n",
-      theta1_left, theta2_left, theta_left);
-  debugPrint("Debug: theta1_right = %f, theta2_right = %f, theta_right = %f\n",
-      theta1_right, theta2_right, theta_right);
-  debugPrint("Debug: left_arc_length = %f, right_arc_length = %f\n",
-      left_arc_length, right_arc_length);
-  debugPrint("Debug: left_cable_length_to_target = %f, right_cable_length_to_target = %f\n",
-      left_cable_length_to_target, right_cable_length_to_target);
-  debugPrint("Debug: left_cable_length_change = %f, right_cable_length_change = %f\n",
-      left_cable_length_change, right_cable_length_change);
-  debugPrint("Debug: kinematicsInverse joints: j[0] = %f, j[1] = %f\n",
-      j[0], j[1]);
+	double left_cable_length_change =
+		LEFT_CABLE_HOME_LENGTH - left_cable_length_to_target;
+	double right_cable_length_change =
+		RIGHT_CABLE_HOME_LENGTH - right_cable_length_to_target;
 
-  return 0;
+	j[0] = left_cable_length_change;
+	j[1] = right_cable_length_change;
+
+	// Print all the calculated values if debug_print is enabled
+
+	if (debug_print) {
+		// Print target coordinates
+		rtapi_print("Debug: Target coordinates - x_target = %f, y_target = %f\n", x_target, y_target);
+
+		// Print distances from drum centers to target
+		rtapi_print("Debug: Distance from LEFT drum center to target = %f\n", distance_left_drum_center_to_target);
+		rtapi_print("Debug: Distance from RIGHT drum center to target = %f\n", distance_right_drum_center_to_target);
+
+		// Print tangent lengths to the target
+		rtapi_print("Debug: LEFT tangent length to target = %f\n", left_tangent_length_to_target);
+		rtapi_print("Debug: RIGHT tangent length to target = %f\n", right_tangent_length_to_target);
+
+		// Print the angles calculated for the left drum
+		rtapi_print("Debug: LEFT drum - theta1_left = %f, theta2_left = %f, total theta_left = %f\n",
+			theta1_left, theta2_left, theta_left);
+
+		// Print the angles calculated for the right drum
+		rtapi_print("Debug: RIGHT drum - theta1_right = %f, theta2_right = %f, total theta_right = %f\n",
+			theta1_right, theta2_right, theta_right);
+
+		// Print arc lengths for both drums
+		rtapi_print("Debug: LEFT drum arc length = %f, RIGHT drum arc length = %f\n",
+			left_arc_length, right_arc_length);
+
+		// Print final cable lengths to the target
+		rtapi_print("Debug: LEFT cable length to target = %f, RIGHT cable length to target = %f\n",
+			left_cable_length_to_target, right_cable_length_to_target);
+
+		// Print the changes in cable length
+		rtapi_print("Debug: LEFT cable length change = %f, RIGHT cable length change = %f\n",
+			left_cable_length_change, right_cable_length_change);
+
+		// Print the final joint values (cable length changes)
+		rtapi_print("Debug: Joint values - j[0] = %f (LEFT cable change), j[1] = %f (RIGHT cable change)\n",
+			j[0], j[1]);
+	}
+	return 0;
 }
