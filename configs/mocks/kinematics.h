@@ -29,4 +29,9 @@ typedef unsigned long int KINEMATICS_INVERSE_FLAGS;
 int kinematicsForward(const double *, EmcPose *,
                       const KINEMATICS_FORWARD_FLAGS *,
                       KINEMATICS_INVERSE_FLAGS *);
+
+int kinematicsInverse(const EmcPose *, double *,
+                      const KINEMATICS_FORWARD_FLAGS *,
+                      KINEMATICS_INVERSE_FLAGS *);
+
 #endif

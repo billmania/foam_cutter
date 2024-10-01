@@ -8,14 +8,14 @@ int main(void)
     int function_result = -1;
 
     EmcPose pos = {{0.0, 0.0, 0.0}, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    KINEMATICS_FORWARD_FLAGS fflags = 0UL;
-    KINEMATICS_INVERSE_FLAGS iflags = 0UL;
+    KINEMATICS_FORWARD_FLAGS fflags = 0;
+    KINEMATICS_INVERSE_FLAGS iflags = 0;
 
     for (double x = 0.0; x <= 100.0; x += 10.0) {
         for (double y = 0.0; y <= 100.0; y += 10.0) {
             pos.tran.x = x;
             pos.tran.y = y;
-            function_result = kinematicsInverse(&pos, &j, &iflags, &fflags);
+            function_result = kinematicsInverse(&pos, j, &iflags, &fflags);
             if (function_result != 0) {
                 printf("kinematicsInverse returned %d\n", function_result);
             } else {
