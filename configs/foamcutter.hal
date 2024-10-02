@@ -3,7 +3,7 @@
 loadrt [KINS]KINEMATICS
 loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[KINS]JOINTS
 
-loadrt hal_pi_gpio dir=0X2F08004 exclude=0X10F7FFB
+loadrt hal_pi_gpio dir=0XF08004 exclude=0X30F7FFB
 
 loadrt stepgen step_type=0,0
 
@@ -16,7 +16,6 @@ addf motion-controller servo-thread
 addf stepgen.update-freq servo-thread
 addf hal_pi_gpio.write  base-thread
 
-net estop-out       => hal_pi_gpio.pin-13-out # GPIO 27
 net xstep           => hal_pi_gpio.pin-15-out # GPIO 22
 net xdir            => hal_pi_gpio.pin-11-out # GPIO 17
 net xenable			=> hal_pi_gpio.pin-07-out # GPIO 4

@@ -262,9 +262,9 @@ int kinematicsForward(
 	const KINEMATICS_FORWARD_FLAGS * fflags,
 	KINEMATICS_INVERSE_FLAGS * iflags) {
 
-	rtapi_print("In kinematics forward");
-	pos->tran.x = 0;
-	pos->tran.y = 0;
+	rtapi_print("In kinematicsForward\n");
+	//pos->tran.x = 0;
+	//pos->tran.y = 0;
 
 	double thetaL = .78;
 	double thetaR = .78;
@@ -300,31 +300,26 @@ int kinematicsForward(
 		if (fabs(deltaThetaL) < 0.00001 && fabs(deltaThetaR) < 0.00001) {
 			pos->tran.x = X;
 			pos->tran.y = Y;
-			pos->tran.z = 0.0;
+			// pos->tran.z = 0.0;
 
 			if (debug_print) {
-				// Print the final theta values for both left and right drums
+
+				rtapi_print("Debug: Iterations to converge = %d\n", MAX_ITERATIONS - iterations);
+
 				rtapi_print("Debug: Converged - ThetaL = %f, ThetaR = %f\n", thetaL * 180 / M_PI, thetaR * 180 / M_PI);
 
-				// Print the number of iterations taken to converge
-				rtapi_print("Debug: Iterations to converge = %d\n", iterations);
-
-				// Print the arc length for both left and right drums
 				rtapi_print("Debug: LEFT arc length = %f, RIGHT arc length = %f\n",
 					thetaL * DRUM_DIAMETER / 2, thetaR * DRUM_DIAMETER / 2);
 
-				// Print the tangent lengths for both drums
 				rtapi_print("Debug: LEFT tangent length = %f, RIGHT tangent length = %f\n",
 					LEFT_CABLE_HOME_LENGTH - (thetaL * DRUM_DIAMETER / 2),
 					RIGHT_CABLE_HOME_LENGTH - (thetaR * DRUM_DIAMETER / 2));
 
-				// Print the X and Y coordinates of the left drum after convergence
-				rtapi_print("Debug: LEFT drum coordinates after convergence - X = %f, Y = %f\n",
+				rtapi_print("Debug: LEFT drum tangent point coordinates after convergence - X = %f, Y = %f\n",
 					LEFT_DRUM_X - cos(thetaL) * DRUM_DIAMETER / 2,
 					LEFT_DRUM_Y - sin(thetaL) * DRUM_DIAMETER / 2);
 
-				// Print the X and Y coordinates of the right drum after convergence
-				rtapi_print("Debug: RIGHT drum coordinates after convergence - X = %f, Y = %f\n",
+				rtapi_print("Debug: RIGHT drum tangent point coordinates after convergence - X = %f, Y = %f\n",
 					RIGHT_DRUM_X + cos(thetaR) * DRUM_DIAMETER / 2,
 					RIGHT_DRUM_Y - sin(thetaR) * DRUM_DIAMETER / 2);
 
@@ -339,6 +334,7 @@ int kinematicsForward(
 int kinematicsInverse(const EmcPose * pos, double* j,
 	const KINEMATICS_INVERSE_FLAGS * iflags,
 	KINEMATICS_FORWARD_FLAGS * fflags) {
+	rtapi_print("In kinematicsInverse\n");
 
 	double x_target = pos->tran.x;
 	double y_target = pos->tran.y;
