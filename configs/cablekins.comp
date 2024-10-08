@@ -397,9 +397,9 @@ int kinematicsInverse(const EmcPose * pos, double* j,
 		right_tangent_length_to_target + right_arc_length;
 
 	double left_cable_length_change =
-        left_cable_length_to_target - LEFT_CABLE_HOME_LENGTH;
+        LEFT_CABLE_HOME_LENGTH - left_cable_length_to_target;
 	double right_cable_length_change =
-        right_cable_length_to_target - RIGHT_CABLE_HOME_LENGTH;
+        RIGHT_CABLE_HOME_LENGTH - right_cable_length_to_target;
 
 	j[0] = left_cable_length_change;
 	j[1] = right_cable_length_change;
